@@ -385,6 +385,7 @@
   }
   .status-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
   .status-available { background: var(--green-light); color: #3d6e0d; }
+  .status-reloading { background: #fff3cd; color: #856404; }
   .status-available .status-dot { background: var(--green); }
   .status-mission { background: var(--orange-light); color: #8a5a00; }
   .status-mission .status-dot { background: var(--orange); }
@@ -2542,8 +2543,14 @@ function getReferenceDateISO() {
 
 function getStatus(truck) {
   const referenceDate = getReferenceDateISO();
+  const today = todayISO();
+  // EN ROUTE : tour actif dont la livraison est dans le futur
   if (truck.deliveryDate && truck.deliveryDate > referenceDate) {
     return { key: 'mission', label: 'EN ROUTE', className: 'status-mission' };
+  }
+  // RECHARGEMENT : livraison aujourd'hui ou passée MAIS un prochain tour existe demain ou après
+  if (truck.nextDeliveryDate && truck.nextDeliveryDate.substring(0,10) > today) {
+    return { key: 'reloading', label: 'RECHARGEMENT', className: 'status-reloading' };
   }
   return { key: 'available', label: 'DISPONIBLE', className: 'status-available' };
 }
@@ -2599,7 +2606,10 @@ function getVisibleTrucks(carrier) {
     }
     // Statut (based on date reference)
     const refDate = getReferenceDateISOFromFilters();
-    const statusKey = (truck.deliveryDate && truck.deliveryDate > refDate) ? 'mission' : 'available';
+    const _ndd = truck.nextDeliveryDate ? truck.nextDeliveryDate.substring(0,10) : '';
+  const statusKey = (truck.deliveryDate && truck.deliveryDate > refDate) ? 'mission'
+    : (_ndd && _ndd > todayISO()) ? 'reloading'
+    : 'available';
     if (activeFilters.statut && activeFilters.statut !== statusKey) return false;
     // Date filter sur EntVonDat (date de livraison)
     if (activeFilters.dateMode === 'fixed' && activeFilters.dateSingle) {
