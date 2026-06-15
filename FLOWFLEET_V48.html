@@ -2183,6 +2183,8 @@ const FLEET_TOTAL_STATIC = {"carrier-1000001": 78, "carrier-1000003": 35, "carri
 // FLEET_TOTAL dynamique — alimenté par XXAV_Vehicles (KreNr = code transporteur)
 // Structure : { carrierId → count } — calculé dans loadVehiclesData()
 let FLEET_TOTAL_DYNAMIC = {};
+// Lookup PolKz (immatriculation tracteur) → BEZ (désignation véhicule), alimenté par XXAV_Vehicles
+let VEHICLE_BEZ = {};
 
 function getFleetTotal(carrier) {
   if (!carrier || !carrier.id) return 0;
@@ -2225,6 +2227,17 @@ function buildFleetTotalsFromVehicles(rows) {
   });
   FLEET_TOTAL_DYNAMIC = newDynamic;
   console.log('[V48] FLEET_TOTAL_DYNAMIC calculé depuis XXAV_Vehicles:', Object.keys(newDynamic).length, 'entrées');
+  // Construire le lookup PolKz → BEZ pour les tracteurs SZM
+  const bezMap = {};
+  rows.forEach(row => {
+    const kat   = String(row['KatKurz'] || '').trim();
+    if (kat !== 'SZM') return;
+    const polKz = String(row['PolKz'] || '').trim();
+    const bez   = String(row['BEZ']   || '').trim();
+    if (polKz && bez) bezMap[polKz.toUpperCase()] = bez;
+  });
+  VEHICLE_BEZ = bezMap;
+  console.log('[V48] VEHICLE_BEZ:', Object.keys(bezMap).length, 'tracteurs');
   // Rafraîchir la sidebar pour afficher les nouveaux totaux
   buildSidebar();
   if (carriers.length && !document.querySelector('.carrier-btn.active')) selectCarrier(carriers[0].id);
@@ -3464,6 +3477,7 @@ function renderTable(id) {
     <thead>
       <tr>
         <th>Tracteur</th>
+        <th style="white-space:nowrap">Désignation</th>
         <th>Chauffeur</th>
         <th>Remplacement</th>
         <th>Remorque</th>
@@ -3508,6 +3522,7 @@ function renderTable(id) {
     });
     tr.innerHTML = `
       <td><button type="button" class="plaque tractor-open ${hasOperationalAlert ? 'tractor-alert' : ''}" data-tractor="${escapeHtml(truck.tractor)}" title="${hasOperationalAlert ? 'Alerte statut opérationnel' : 'Ouvrir le détail tracteur'}">${escapeHtml(truck.tractor)}</button></td>
+      <td style="font-size:11px;color:var(--muted);white-space:nowrap">${escapeHtml(VEHICLE_BEZ[truck.tractor.toUpperCase()] || '—')}</td>
       <td id="driver-cell-${escapeHtml(truck.tractor)}" style="${isLorangCarrier ? getDriverCellStyle(id, truck) : ''}">
         ${isLorangCarrier ? `
         <div style="display:flex;align-items:center;gap:4px">
