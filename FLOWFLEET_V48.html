@@ -4268,6 +4268,7 @@ function renderStammView() {
     <th>Remorque attitrée</th>
     <th>Chauffeur attitré</th>
     <th>Type</th>
+    <th>Désignation</th>
     <th>Springer</th>
     <th>Remorque rempl.</th>
     <th>Type rempl.</th>
@@ -4279,6 +4280,7 @@ function renderStammView() {
     <td><input class="sf-col filter-input" style="width:90px" data-col="trailer" placeholder="LP…" value="${escapeHtml(stammFilters.trailer||'')}"></td>
     <td><input class="sf-col filter-input" style="width:130px" data-col="driver" placeholder="Chauffeur…" value="${escapeHtml(stammFilters.driver||'')}"></td>
     <td><input class="sf-col filter-input" style="width:70px" data-col="aufbau" placeholder="EX1…" value="${escapeHtml(stammFilters.aufbau||'')}"></td>
+    <td></td>
     <td><input class="sf-col filter-input" style="width:120px" data-col="springer" placeholder="Springer…" value="${escapeHtml(stammFilters.springer||'')}"></td>
     <td><input class="sf-col filter-input" style="width:90px" data-col="trailer_rest" placeholder="LP…" value="${escapeHtml(stammFilters.trailer_rest||'')}"></td>
     <td><input class="sf-col filter-input" style="width:70px" data-col="aufbau2" placeholder="Type…" value="${escapeHtml(stammFilters.aufbau2||'')}"></td>
@@ -4319,6 +4321,7 @@ function renderStammView() {
           <option value="">—</option>${typeOpts}
         </select>
       </td>
+      <td style="font-size:11px;color:var(--muted);white-space:nowrap">${escapeHtml(VEHICLE_BEZ[s.tractor.toUpperCase()] || '—')}</td>
       <td>${springerVal
         ? '<span class="status-badge status-mission"><span class="status-dot"></span>' + escapeHtml(springerVal) + '</span>'
         : '<span class="muted">—</span>'}</td>
