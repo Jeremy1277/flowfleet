@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>FLOW FLEET</title>
+<title>LORANG FLEET</title>
 <style>
   :root {
     /* ── CODIR 4PL Theme ── */
@@ -2244,42 +2244,34 @@ function buildFleetTotalsFromVehicles(rows) {
   if (carriers.length && !document.querySelector('.carrier-btn.active')) selectCarrier(carriers[0].id);
 }
 
-// Charge XXAV_Vehicles depuis SharePoint FLOWFLEET
 async function loadVehiclesData(token, siteId) {
   try {
     const headers = { Authorization: 'Bearer ' + token, Accept: 'application/json' };
-    const fileUrl = 'https://graph.microsoft.com/v1.0/sites/luxportlu.sharepoint.com,c08e049e-f0db-4e60-81f2-8335088ecb13/drive/root:/Documents/vehicles_data.json:/content';
-    const resp = await fetch(fileUrl, { headers });
-    if (!resp.ok) {
-      console.warn('[V48] vehicles_data.json HTTP ' + resp.status);
-      return;
-    }
-    const data = await resp.json();
-    console.log('[V48] vehicles_data.json reçu — type:', typeof data, Array.isArray(data) ? 'array len='+data.length : JSON.stringify(data).substring(0,200));
+    const metaUrl = 'https://graph.microsoft.com/v1.0/sites/luxportlu.sharepoint.com,c08e049e-f0db-4e60-81f2-8335088ecb13/drive/root:/Documents/vehicles_data.json';
+    const metaResp = await fetch(metaUrl, { headers });
+    if (!metaResp.ok) { console.warn('[V48] vehicles_data.json HTTP ' + metaResp.status); return; }
+    const meta = await metaResp.json();
+    const dlResp = await fetch(meta['@microsoft.graph.downloadUrl']);
+    if (!dlResp.ok) { console.warn('[V48] vehicles_data.json download HTTP ' + dlResp.status); return; }
+    const data = await dlResp.json();
     let rows = data.vehicles || data.rows || data || [];
-    // Power Automate SELECTCOLUMNS peut retourner un tableau de tableaux
-    // Format 1 (objet) : [{PolKz:'LP1138', KatKurz:'SZM', BEZ:'SZM 6x2'}, ...]
-    // Format 2 (tableau) : [['LP1138','SZM','1000001','...','SZM 6x2'], ...]
     if (Array.isArray(rows) && rows.length && Array.isArray(rows[0])) {
-      // Format tableau — mapper selon l'ordre des colonnes DAX : PolKz,KatKurz,KreNr,FahName,AnhPolKz,MaGrp,BEZ
       const cols = ['PolKz','KatKurz','KreNr','FahName','AnhPolKz','MaGrp','BEZ'];
-      rows = rows.map(r => {
-        const obj = {};
-        cols.forEach((c, i) => obj[c] = r[i] !== undefined ? r[i] : '');
+      rows = rows.map(function(r) {
+        var obj = {};
+        cols.forEach(function(c, i) { obj[c] = r[i] !== undefined ? r[i] : ''; });
         return obj;
       });
-      console.log('[V48] Format tableau détecté — converti en objets, ex:', JSON.stringify(rows[0]));
     }
     if (Array.isArray(rows) && rows.length) {
-      // Normaliser : accepter Bez ou BEZ
-      rows = rows.map(r => ({ ...r, BEZ: r['BEZ'] || r['Bez'] || r['bez'] || '' }));
-      console.log('[V48] Ex row[0]:', JSON.stringify(rows[0]));
+      rows = rows.map(function(r) { return Object.assign({}, r, { BEZ: r['BEZ'] || r['Bez'] || r['bez'] || '' }); });
+      console.log('[V48] vehicles_data.json OK', rows.length, 'rows, ex:', JSON.stringify(rows[0]));
       buildFleetTotalsFromVehicles(rows);
     } else {
-      console.warn('[V48] vehicles_data.json vide ou format inattendu:', JSON.stringify(data).substring(0,300));
+      console.warn('[V48] vehicles_data.json format inattendu');
     }
   } catch(e) {
-    console.warn('[V48] Erreur chargement vehicles_data.json:', e.message);
+    console.warn('[V48] Erreur vehicles_data.json:', e.message);
   }
 }
 
