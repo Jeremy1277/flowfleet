@@ -3352,7 +3352,11 @@ function selectDriversView() {
     </button>
     <button onclick="resetAllDriverStatuses()" style="font-size:10px;padding:3px 10px;background:#e63530;color:#fff;border:none;border-radius:4px;cursor:pointer;font-family:var(--font-head);font-weight:700;letter-spacing:0.05em;">
       ↺ Réinitialiser tous les statuts
-    </button>`;
+    </button>
+    <label style="font-size:10px;padding:3px 10px;background:#004D8C;color:#fff;border:none;border-radius:4px;cursor:pointer;display:inline-block;font-family:var(--font-head);font-weight:700;letter-spacing:0.05em;" title="Importer tracteurs depuis Excel">
+      ⬆ Import tracteurs
+      <input type="file" accept=".xlsx,.xls" id="import-fleet-input" style="display:none" onchange="importFleetData(this)">
+    </label>`;
   document.getElementById('carrier-title').innerHTML = '<span>Chauffeurs</span>';
   // carrier-subtitle hidden
   renderDriversView();
@@ -4682,6 +4686,48 @@ function getStammSpringer(tractor) {
   if (!entry || !entry.driver) return '';
   const driver = String(entry.driver).trim().replace(/\s+/g, ' ');
   return getDriverReplacement(driver) || getDriverReplacement(driver.toUpperCase()) || '';
+}
+
+// ── Import Excel tracteurs attitres ──
+function importFleetData(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+      if (!rows.length) { alert('Fichier vide ou format non reconnu'); return; }
+      const keys = Object.keys(rows[0]);
+      const findCol = (...cands) => keys.find(k => cands.some(c => k.trim().toUpperCase().includes(c.toUpperCase())));
+      const colDriver  = findCol('CHAUFFEUR','FAHRER','DRIVER','NOM');
+      const colTractor = findCol('TRACTEUR','TRACTOR','LKW','IMMAT');
+      if (!colDriver || !colTractor) {
+        alert('Colonnes non trouvees. Colonnes detectees : ' + keys.join(', '));
+        input.value = ''; return;
+      }
+      let updated = 0;
+      rows.forEach(row => {
+        const driver  = String(row[colDriver]  || '').trim();
+        const tractor = String(row[colTractor] || '').trim();
+        if (!driver || !tractor) return;
+        const fi = FLEET_DATA.findIndex(e => normalizeDriverName(e.driver) === normalizeDriverName(driver));
+        if (fi >= 0) { FLEET_DATA[fi].tractor = tractor; updated++; }
+        const si = STAMM_DATA.findIndex(s => normalizeDriverName(s.driver) === normalizeDriverName(driver));
+        if (si >= 0) STAMM_DATA[si].tractor = tractor;
+        setSharedValue('import', driver, 'assignedTractor', tractor);
+      });
+      input.value = '';
+      renderDriversView();
+      if (activeView === 'stamm') renderStammView();
+      alert('OK : ' + updated + ' tracteur(s) mis a jour sur ' + rows.length + ' ligne(s).');
+    } catch(err) {
+      alert('Erreur : ' + err.message);
+      input.value = '';
+    }
+  };
+  reader.readAsArrayBuffer(file);
 }
 
 // ── Export Excel tableau actif ──
