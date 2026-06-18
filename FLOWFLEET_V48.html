@@ -4657,7 +4657,11 @@ function getStammSpringer(tractor) {
   if (!entry || !entry.driver) return '';
   // Normaliser le nom pour matcher la clé localStorage
   const driver = String(entry.driver).trim().replace(/\s+/g, ' ');
-  return getDriverReplacement(driver) || getDriverReplacement(driver.toUpperCase()) || '';
+  const repl = getDriverReplacement(driver) || getDriverReplacement(driver.toUpperCase()) || '';
+  if (!repl) return '';
+  // Valider que la valeur est un vrai springer (présent dans SPRINGER_DATA)
+  const validNames = SPRINGER_DATA.filter(sp => !sp.isSeparator).map(sp => sp.fullname.trim().toUpperCase());
+  return validNames.includes(repl.trim().toUpperCase()) ? repl : '';
 }
 
 const STAMM_EDITS_KEY = 'dispo-flotte-stamm-edits';
