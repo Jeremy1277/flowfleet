@@ -1720,7 +1720,15 @@
     gap: 6px;
     letter-spacing: .02em;
   }
-  .topbar .btn-export {
+  .topbar .btn-save {
+  background: #1a56a0; color: #fff; border: none; border-radius: 6px;
+  padding: 7px 14px; font-size: 12px; font-weight: 700; cursor: pointer;
+  display: flex; align-items: center; gap: 6px; white-space: nowrap;
+  transition: background .15s;
+}
+.topbar .btn-save:hover { background: #134080; }
+.topbar .btn-save.saving { opacity: .7; cursor: wait; }
+.topbar .btn-export {
   background: #217346; color: #fff; border: none; border-radius: 6px;
   padding: 7px 14px; font-size: 12px; font-weight: 700; cursor: pointer;
   display: flex; align-items: center; gap: 6px; white-space: nowrap;
@@ -1871,6 +1879,9 @@ var st,ct,ut,lt,dt,ht,pt,gt,ft,mt=function(){function t(e,t,r){this.networkInter
     <span class="target-badge">WINSPED + FAHRER</span>
     <button id="btn-refresh" class="btn btn-refresh" onclick="refreshData()" title="Recharger les données Winsped">
       <span id="refresh-icon" class="refresh-icon">↺</span> Rafraîchir
+    </button>
+    <button id="btn-save-data" class="btn btn-save" onclick="saveFleetData()" title="Sauvegarder FLEET_DATA et STAMM_DATA sur SharePoint">
+      💾 Enregistrer
     </button>
     <button id="btn-export-xl" class="btn btn-export" onclick="exportActiveView()" title="Exporter le tableau actif en Excel">
       ⬇ Excel
@@ -4034,6 +4045,8 @@ async function loadFromSharePoint(token) {
     loadVehiclesData(token, siteId);
     // Charger les statuts partagés depuis SharePoint FLOWFLEET
     loadFleetStatus(token);
+    // Charger FLEET_DATA + STAMM_DATA depuis SharePoint FLOWFLEET
+    loadFleetData(token);
 
   } catch(e) {
     console.warn('SP error:', e);
@@ -4688,6 +4701,79 @@ function getStammSpringer(tractor) {
   return getDriverReplacement(driver) || getDriverReplacement(driver.toUpperCase()) || '';
 }
 
+// ── fleet_data.json sur SharePoint FLOWFLEET ──
+const FLEET_DATA_PATH = 'fleet_data.json';
+
+async function loadFleetData(token) {
+  try {
+    _fleetToken = token;
+    const headers = { Authorization: 'Bearer ' + token, Accept: 'application/json' };
+    const driveId = await resolveFleetDrive(token);
+    const url = 'https://graph.microsoft.com/v1.0/drives/' + driveId + '/root:/' + FLEET_DATA_PATH;
+    const metaResp = await fetch(url, { headers });
+    if (metaResp.status === 404) {
+      console.log('[FleetData] Pas de fleet_data.json — utilisation des données statiques');
+      return;
+    }
+    if (!metaResp.ok) throw new Error('HTTP ' + metaResp.status);
+    const meta = await metaResp.json();
+    const dlResp = await fetch(meta['@microsoft.graph.downloadUrl']);
+    if (!dlResp.ok) throw new Error('Download HTTP ' + dlResp.status);
+    const data = await dlResp.json();
+    // Mettre à jour FLEET_DATA
+    if (Array.isArray(data.fleetData) && data.fleetData.length) {
+      data.fleetData.forEach(entry => {
+        const fi = FLEET_DATA.findIndex(e => normalizeDriverName(e.driver) === normalizeDriverName(entry.driver));
+        if (fi >= 0) Object.assign(FLEET_DATA[fi], entry);
+        else FLEET_DATA.push(entry);
+      });
+      console.log('[FleetData] FLEET_DATA mis a jour:', data.fleetData.length, 'entrees');
+    }
+    // Mettre à jour STAMM_DATA
+    if (Array.isArray(data.stammData) && data.stammData.length) {
+      data.stammData.forEach(entry => {
+        const si = STAMM_DATA.findIndex(s => s.tractor === entry.tractor);
+        if (si >= 0) Object.assign(STAMM_DATA[si], entry);
+        else STAMM_DATA.push(entry);
+      });
+      console.log('[FleetData] STAMM_DATA mis a jour:', data.stammData.length, 'entrees');
+    }
+    // Rafraîchir l'affichage
+    if (typeof buildSidebar === 'function') buildSidebar();
+    if (activeCarrierId) renderTable(activeCarrierId);
+    if (activeView === 'stamm') renderStammView();
+    if (activeView === 'drivers') renderDriversView();
+  } catch(e) {
+    console.warn('[FleetData] Erreur chargement:', e.message);
+  }
+}
+
+async function saveFleetData() {
+  if (!_fleetToken) { alert('Non connecte — veuillez vous authentifier'); return; }
+  const btn = document.getElementById('btn-save-data');
+  if (btn) { btn.classList.add('saving'); btn.textContent = '💾 Enregistrement...'; }
+  try {
+    const headers = { Authorization: 'Bearer ' + _fleetToken, 'Content-Type': 'application/json' };
+    const driveId = await resolveFleetDrive(_fleetToken);
+    const userName = document.getElementById('user-name')?.textContent || 'Inconnu';
+    const payload = JSON.stringify({
+      lastUpdate: new Date().toISOString(),
+      updatedBy: userName,
+      fleetData: FLEET_DATA,
+      stammData: STAMM_DATA
+    });
+    const url = 'https://graph.microsoft.com/v1.0/drives/' + driveId + '/root:/' + FLEET_DATA_PATH + ':/content';
+    const resp = await fetch(url, { method: 'PUT', headers, body: payload });
+    if (!resp.ok) throw new Error('PUT HTTP ' + resp.status);
+    console.log('[FleetData] Sauvegarde OK');
+    if (btn) { btn.classList.remove('saving'); btn.textContent = '✅ Enregistre'; setTimeout(() => { btn.textContent = '💾 Enregistrer'; }, 2500); }
+  } catch(e) {
+    console.warn('[FleetData] Erreur sauvegarde:', e.message);
+    alert('Erreur sauvegarde : ' + e.message);
+    if (btn) { btn.classList.remove('saving'); btn.textContent = '💾 Enregistrer'; }
+  }
+}
+
 // ── Import Excel tracteurs attitres ──
 function importFleetData(input) {
   const file = input.files[0];
@@ -4721,6 +4807,7 @@ function importFleetData(input) {
       input.value = '';
       renderDriversView();
       if (activeView === 'stamm') renderStammView();
+      saveFleetData();
       alert('OK : ' + updated + ' tracteur(s) mis a jour sur ' + rows.length + ' ligne(s).');
     } catch(err) {
       alert('Erreur : ' + err.message);
