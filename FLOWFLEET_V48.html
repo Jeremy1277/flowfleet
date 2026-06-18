@@ -4422,9 +4422,14 @@ function renderStammView() {
         </select>
       </td>
       <td style="font-size:11px;color:var(--muted);white-space:nowrap">${escapeHtml(VEHICLE_BEZ[s.tractor.toUpperCase()] || '—')}</td>
-      <td>${springerVal
-        ? '<span class="status-badge status-mission"><span class="status-dot"></span>' + escapeHtml(springerVal) + '</span>'
-        : '<span class="muted">—</span>'}</td>
+      <td>
+        <input class="editable-input stamm-inline-input stamm-springer-input"
+          data-tractor="${escapeHtml(s.tractor)}"
+          data-field="springer"
+          value="${escapeHtml(springerVal)}"
+          placeholder="Springer…"
+          style="min-width:120px;${springerVal ? 'border-color:#f59e0b;font-weight:600;color:#92400e;background:#fff8ee;' : ''}">
+      </td>
       <td>
         <input class="editable-input stamm-inline-input" data-tractor="${escapeHtml(s.tractor)}" data-field="trailer_rest"
           value="${escapeHtml(s.trailer_rest || '')}" placeholder="Saisir…" style="min-width:110px">
@@ -4473,10 +4478,20 @@ function renderStammView() {
     });
   });
 
-  // Wire inline inputs (save on blur for trailer_rest / aufbau2)
+  // Wire inline inputs (save on blur for trailer_rest / aufbau2 / springer)
   wrap.querySelectorAll('.stamm-inline-input').forEach(inp => {
     inp.addEventListener('blur', e => {
-      saveStammField(e.target.dataset.tractor, e.target.dataset.field, e.target.value.trim());
+      const tractor = e.target.dataset.tractor;
+      const field   = e.target.dataset.field;
+      const val     = e.target.value.trim();
+      saveStammField(tractor, field, val);
+      // Si c'est le springer : mettre aussi à jour le remplacement du chauffeur attitré
+      if (field === 'springer') {
+        const entry = (getCustomStamm().find(s => s.tractor === tractor) || STAMM_DATA.find(s => s.tractor === tractor));
+        if (entry && entry.driver) {
+          setDriverReplacement(String(entry.driver).trim().replace(/\s+/g, ' '), val);
+        }
+      }
     });
   });
 
@@ -4652,16 +4667,10 @@ function saveStammField(tractor, field, value) {
 // Returns the current replacement driver assigned to this tractor
 // (set via the Chauffeurs section), or '' if none
 function getStammSpringer(tractor) {
-  // Chercher d'abord dans les customisations, puis STAMM_DATA
   const entry = (getCustomStamm().find(s => s.tractor === tractor) || STAMM_DATA.find(s => s.tractor === tractor));
   if (!entry || !entry.driver) return '';
-  // Normaliser le nom pour matcher la clé localStorage
   const driver = String(entry.driver).trim().replace(/\s+/g, ' ');
-  const repl = getDriverReplacement(driver) || getDriverReplacement(driver.toUpperCase()) || '';
-  if (!repl) return '';
-  // Valider que la valeur est un vrai springer (présent dans SPRINGER_DATA)
-  const validNames = SPRINGER_DATA.filter(sp => !sp.isSeparator).map(sp => sp.fullname.trim().toUpperCase());
-  return validNames.includes(repl.trim().toUpperCase()) ? repl : '';
+  return getDriverReplacement(driver) || getDriverReplacement(driver.toUpperCase()) || '';
 }
 
 const STAMM_EDITS_KEY = 'dispo-flotte-stamm-edits';
