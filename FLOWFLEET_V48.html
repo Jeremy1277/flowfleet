@@ -4692,7 +4692,7 @@ function exportActiveView() {
     // Camions-Remorques — toutes les données STAMM sans filtre
     filename = 'Camions_Remorques.xlsx';
     headers = ['Tracteur','Remorque attitrée','Chauffeur attitré','Type','Désignation','Springer','Remorque rempl.','Type rempl.','Affectation'];
-    const allStamm = buildStammList();
+    const allStamm = STAMM_DATA.filter(s => !_getHidStam().includes(s.tractor));
     allStamm.forEach(s => {
       const springer = getStammSpringer(s.tractor) || s.springer || '';
       rows.push([s.tractor, s.trailer, s.driver, s.aufbau, VEHICLE_BEZ[s.tractor.toUpperCase()]||'', springer, s.trailer_rest, s.aufbau2, s.vergeben]);
