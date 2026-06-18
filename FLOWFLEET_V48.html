@@ -4459,6 +4459,14 @@ function renderStammView() {
     });
   });
 
+  // Wire filter inputs (update stammFilters + re-render on input)
+  wrap.querySelectorAll('.sf-col.filter-input').forEach(inp => {
+    inp.addEventListener('input', e => {
+      stammFilters[e.target.dataset.col] = e.target.value.trim().toUpperCase();
+      renderStammView();
+    });
+  });
+
   // Wire inline inputs (save on blur for trailer_rest / aufbau2)
   wrap.querySelectorAll('.stamm-inline-input').forEach(inp => {
     inp.addEventListener('blur', e => {
