@@ -4652,13 +4652,12 @@ function saveStammField(tractor, field, value) {
 // Returns the current replacement driver assigned to this tractor
 // (set via the Chauffeurs section), or '' if none
 function getStammSpringer(tractor) {
-  // Find the driver canonically assigned to this tractor
-  const entry = STAMM_DATA.find(s => s.tractor === tractor);
+  // Chercher d'abord dans les customisations, puis STAMM_DATA
+  const entry = (getCustomStamm().find(s => s.tractor === tractor) || STAMM_DATA.find(s => s.tractor === tractor));
   if (!entry || !entry.driver) return '';
-  const driver = entry.driver;
-  // Check if a replacement is stored for that driver
-  const repl = getDriverReplacement(driver);
-  return repl || '';
+  // Normaliser le nom pour matcher la clé localStorage
+  const driver = String(entry.driver).trim().replace(/\s+/g, ' ');
+  return getDriverReplacement(driver) || getDriverReplacement(driver.toUpperCase()) || '';
 }
 
 const STAMM_EDITS_KEY = 'dispo-flotte-stamm-edits';
