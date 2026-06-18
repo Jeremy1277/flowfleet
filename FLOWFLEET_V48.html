@@ -1720,7 +1720,14 @@
     gap: 6px;
     letter-spacing: .02em;
   }
-  .topbar .btn-refresh {
+  .topbar .btn-export {
+  background: #217346; color: #fff; border: none; border-radius: 6px;
+  padding: 7px 14px; font-size: 12px; font-weight: 700; cursor: pointer;
+  display: flex; align-items: center; gap: 6px; white-space: nowrap;
+  transition: background .15s;
+}
+.topbar .btn-export:hover { background: #1a5c38; }
+.topbar .btn-refresh {
     background: #85BC25;
     color: #0D1B2A;
     font-weight: 600;
@@ -1863,6 +1870,9 @@ var st,ct,ut,lt,dt,ht,pt,gt,ft,mt=function(){function t(e,t,r){this.networkInter
     <span class="target-badge">WINSPED + FAHRER</span>
     <button id="btn-refresh" class="btn btn-refresh" onclick="refreshData()" title="Recharger les données Winsped">
       <span id="refresh-icon" class="refresh-icon">↺</span> Rafraîchir
+    </button>
+    <button id="btn-export-xl" class="btn btn-export" onclick="exportActiveView()" title="Exporter le tableau actif en Excel">
+      ⬇ Excel
     </button>
   </div>
 </header>
@@ -4671,6 +4681,68 @@ function getStammSpringer(tractor) {
   if (!entry || !entry.driver) return '';
   const driver = String(entry.driver).trim().replace(/\s+/g, ' ');
   return getDriverReplacement(driver) || getDriverReplacement(driver.toUpperCase()) || '';
+}
+
+// ── Export Excel tableau actif ──
+function exportActiveView() {
+  let rows = [], headers = [], filename = 'export.xlsx';
+
+  if (activeView === 'stamm') {
+    // Camions-Remorques — toutes les données STAMM sans filtre
+    filename = 'Camions_Remorques.xlsx';
+    headers = ['Tracteur','Remorque attitrée','Chauffeur attitré','Type','Désignation','Springer','Remorque rempl.','Type rempl.','Affectation'];
+    const allStamm = buildStammList();
+    allStamm.forEach(s => {
+      const springer = getStammSpringer(s.tractor) || s.springer || '';
+      rows.push([s.tractor, s.trailer, s.driver, s.aufbau, VEHICLE_BEZ[s.tractor.toUpperCase()]||'', springer, s.trailer_rest, s.aufbau2, s.vergeben]);
+    });
+  } else if (activeView === 'drivers') {
+    // Chauffeurs
+    filename = 'Chauffeurs.xlsx';
+    headers = ['Nom','Prénom','Naissance','Âge','Entrée','Ancienneté','Tracteur attitré','Remorque attitrée','Statut','Springer'];
+    getAllDriverNames().forEach(driver => {
+      const dInfo = getDriverInfo(driver);
+      const status = getDriverFleetStatus(driver);
+      const statusLabel = driverStatusOptions.find(o => o.value === status)?.label || status;
+      const repl = getDriverReplacement(driver);
+      const fleetEntry = carriers.flatMap(c => c.trucks).find(t => normalizeDriverName(t.driver) === normalizeDriverName(driver));
+      rows.push([
+        dInfo ? dInfo.nom : driver.split(' ')[0],
+        dInfo ? dInfo.prenom : '',
+        dInfo ? dInfo.dob : '',
+        dInfo ? dInfo.age : '',
+        dInfo ? dInfo.entry : '',
+        dInfo ? dInfo.seniority + ' an(s)' : '',
+        fleetEntry ? fleetEntry.tractor : '',
+        fleetEntry ? fleetEntry.trailer : '',
+        statusLabel,
+        repl
+      ]);
+    });
+  } else {
+    // Vue transporteur (carrier actif)
+    filename = 'Transporteur_' + (activeCarrierId || 'export') + '.xlsx';
+    headers = ['Tracteur','Chauffeur','Remorque','Statut','Ville livraison','Pays','CP','Disponible le'];
+    const carrier = carriers.find(c => c.id === activeCarrierId);
+    if (carrier) {
+      carrier.trucks.forEach(truck => {
+        const st = getStatus(truck);
+        const avDate = getAvailableDate(truck);
+        const stored = getSharedValue(activeCarrierId, truck.tractor, 'driver', '') || truck.driver || '';
+        const remorque = getSharedValue(activeCarrierId, truck.tractor, 'remorque', '') || truck.trailer || '';
+        rows.push([truck.tractor, stored, remorque, st.label, truck.city||'', truck.country||'', truck.zip||'', avDate]);
+      });
+    }
+  }
+
+  // Construire le fichier Excel (XLSX via SheetJS)
+  const wb = XLSX.utils.book_new();
+  const wsData = [headers, ...rows];
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  // Style header (largeur auto)
+  ws['!cols'] = headers.map(() => ({ wch: 20 }));
+  XLSX.utils.book_append_sheet(wb, ws, 'Export');
+  XLSX.writeFile(wb, filename);
 }
 
 const STAMM_EDITS_KEY = 'dispo-flotte-stamm-edits';
